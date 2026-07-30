@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/service/dashboard_screen.dart';
+import 'package:flutter_application_1/views/dashboard_screen.dart';
 
 void main() {
   runApp(const SakuSiswaApp());
