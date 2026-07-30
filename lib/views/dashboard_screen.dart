@@ -74,43 +74,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
             right: 20,
             bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Tambah Pengeluaran',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: judulController,
-                decoration: const InputDecoration(
-                  labelText: 'Keterangan Pengeluaran',
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tambah Pengeluaran',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: nominalController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Nominal (Rp)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: judulController,
+                  decoration: const InputDecoration(
+                    labelText: 'Keterangan Pengeluaran',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final judul = judulController.text.trim();
-                    final nominal = int.tryParse(nominalController.text) ?? 0;
-                    _tambahPengeluaran(judul, nominal);
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('Simpan Pengeluaran'),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nominalController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Nominal (Rp)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      final judul = judulController.text.trim();
+                      final nominal = int.tryParse(nominalController.text) ?? 0;
+                      _tambahPengeluaran(judul, nominal);
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('Simpan Pengeluaran'),
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
