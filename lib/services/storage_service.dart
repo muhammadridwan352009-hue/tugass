@@ -1,233 +1,94 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const SakuSiswaApp());
-}
+/// Service untuk menangani penyimpanan data lokal menggunakan SharedPreferences.
+/// Mendukung penyimpanan objek dalam bentuk JSON (Map/List) maupun tipe primitif.
+class StorageService {
+  StorageService._internal();
+  static final StorageService _instance = StorageService._internal();
+  factory StorageService() => _instance;
 
-class SakuSiswaApp extends StatelessWidget {
-  const SakuSiswaApp({super.key});
+  SharedPreferences? _prefs;
 
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'SakuSiswa',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.teal,
-      ),
-      home: const DashboardScreen(),
-    );
-  }
-}
-
-class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
-
-  @override
-  State<DashboardScreen> createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _totalSaldo = 0;
-  List<Map<String, dynamic>> _riwayatPengeluaran = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _muatDataLokal();
+  /// Wajib dipanggil sekali di awal (misalnya di main()) sebelum service dipakai.
+  Future<void> init() async {
+    _prefs ??= await SharedPreferences.getInstance();
   }
 
-  // --- LOGIKA SHAREDPREFERENCES --- //
-
-  // 1. Membaca data dari SharedPreferences
-  Future<void> _muatDataLokal() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _totalSaldo = prefs.getInt('total_saldo') ?? 0;
-      
-      // Membaca list string JSON dan di-decode kembali ke List Map
-      List<String>? dataStringList = prefs.getStringList('riwayat');
-      if (dataStringList != null) {
-        _riwayatPengeluaran = dataStringList
-            .map((item) => jsonDecode(item) as Map<String, dynamic>)
-            .toList();
-      }
-    });
+  SharedPreferences get _prefsInstance {
+    if (_prefs == null) {
+      throw StateError(
+        'StorageService belum diinisialisasi. Panggil StorageService().init() terlebih dahulu.',
+      );
+    }
+    return _prefs!;
   }
 
-  // 2. Menyimpan data ke SharedPreferences
-  Future<void> _simpanDataLokal() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('total_saldo', _totalSaldo);
+  // ---------- Penyimpanan objek/JSON ----------
 
-    // Mengubah List Map menjadi List String JSON
-    List<String> dataStringList =
-        _riwayatPengeluaran.map((item) => jsonEncode(item)).toList();
-    await prefs.setStringList('riwayat', dataStringList);
+  /// Menyimpan objek (Map atau List) sebagai JSON string.
+  Future<bool> saveObject(String key, dynamic value) async {
+    final jsonString = jsonEncode(value);
+    return await _prefsInstance.setString(key, jsonString);
   }
 
-  // 3. Menambah transaksi baru
-  void _tambahPengeluaran(String judul, int nominal) {
-    if (nominal <= 0 || judul.isEmpty) return;
-
-    setState(() {
-      _totalSaldo -= nominal;
-      _riwayatPengeluaran.insert(0, {
-        'judul': judul,
-        'nominal': nominal,
-        'tanggal': DateTime.now().toString().substring(0, 10),
-      });
-    });
-
-    _simpanDataLokal(); // Simpan permanen ke storage HP
+  /// Mengambil objek yang tersimpan sebagai Map<String, dynamic>.
+  /// Mengembalikan null jika key tidak ditemukan atau gagal parse.
+  Map<String, dynamic>? getObject(String key) {
+    final jsonString = _prefsInstance.getString(key);
+    if (jsonString == null) return null;
+    try {
+      final decoded = jsonDecode(jsonString);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 
-  // 4. Modal Bottom Sheet Form Input (UI Modern)
-  void _tampilkanModalInput() {
-    final judulController = TextEditingController();
-    final nominalController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          top: 20,
-          left: 20,
-          right: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Tambah Pengeluaran', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            TextField(
-              controller: judulController,
-              decoration: const InputDecoration(
-                labelText: 'Keterangan (misal: Beli Pop Ice / Print Tugas)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: nominalController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Nominal (Rp)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  final judul = judulController.text;
-                  final nominal = int.tryParse(nominalController.text) ?? 0;
-                  _tambahPengeluaran(judul, nominal);
-                  Navigator.pop(ctx);
-                },
-                child: const Text('Simpan Pengeluaran'),
-              ),
-            )
-          ],
-        ),
-      ),
-    );
+  /// Mengambil objek yang tersimpan sebagai List<dynamic>.
+  List<dynamic>? getList(String key) {
+    final jsonString = _prefsInstance.getString(key);
+    if (jsonString == null) return null;
+    try {
+      final decoded = jsonDecode(jsonString);
+      if (decoded is List<dynamic>) return decoded;
+      return null;
+    } catch (e) {
+      return null;
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('SakuSiswa Dashboard'),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            // CARD UI STANDAR INDUSTRI
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: Colors.teal.shade700,
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  children: [
-                    const Text('Sisa Uang Saku Saat Ini',
-                        style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Rp $_totalSaldo',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton.icon(
-                      onPressed: () {
-                        setState(() => _totalSaldo += 50000);
-                        _simpanDataLokal();
-                      },
-                      icon: const Icon(Icons.add_card, color: Colors.white),
-                      label: const Text('Isi Uang Saku (+Rp50.000)',
-                          style: TextStyle(color: Colors.white)),
-                    )
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Riwayat Pengeluaran',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 10),
-            
-            // DYNAMIC LISTVIEW
-            Expanded(
-              child: _riwayatPengeluaran.isEmpty
-                  ? const Center(child: Text('Belum ada pengeluaran hari ini. Hemat banget! 🎉'))
-                  : ListView.builder(
-                      itemCount: _riwayatPengeluaran.length,
-                      itemBuilder: (context, index) {
-                        final item = _riwayatPengeluaran[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          child: ListTile(
-                            leading: const CircleAvatar(
-                              child: Icon(Icons.shopping_bag_outlined),
-                            ),
-                            title: Text(item['judul']),
-                            subtitle: Text(item['tanggal']),
-                            trailing: Text(
-                              '- Rp ${item['nominal']}',
-                              style: const TextStyle(
-                                  color: Colors.red, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _tampilkanModalInput,
-        icon: const Icon(Icons.remove_circle_outline),
-        label: const Text('Catat Pengeluaran'),
-      ),
-    );
-  }
+  // ---------- Tipe primitif ----------
+
+  Future<bool> saveString(String key, String value) =>
+      _prefsInstance.setString(key, value);
+
+  String? getString(String key) => _prefsInstance.getString(key);
+
+  Future<bool> saveInt(String key, int value) =>
+      _prefsInstance.setInt(key, value);
+
+  int? getInt(String key) => _prefsInstance.getInt(key);
+
+  Future<bool> saveBool(String key, bool value) =>
+      _prefsInstance.setBool(key, value);
+
+  bool? getBool(String key) => _prefsInstance.getBool(key);
+
+  Future<bool> saveDouble(String key, double value) =>
+      _prefsInstance.setDouble(key, value);
+
+  double? getDouble(String key) => _prefsInstance.getDouble(key);
+
+  // ---------- Utilitas ----------
+
+  /// Menghapus satu key.
+  Future<bool> remove(String key) => _prefsInstance.remove(key);
+
+  /// Mengecek apakah key ada.
+  bool containsKey(String key) => _prefsInstance.containsKey(key);
+
+  /// Menghapus semua data yang tersimpan.
+  Future<bool> clearAll() => _prefsInstance.clear();
 }
